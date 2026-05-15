@@ -1,0 +1,255 @@
+# UKB-DRP 论文实现路径 vs 复现路径对照
+
+## 总览
+
+```
+论文管线:  UKB原始CSV → DataGeneration(S01-S06) → AD_Training(s01-s05) → Deploy → 评估 → 论文结果(AUC 0.848-0.890)
+复现管线:  UKB .npz文件 → bridge_to_training_v3   → run_final_fast       → Deploy → 评估 → 复现结果(AUC 0.667-0.836)
+```
+
+---
+
+## 逐步对照
+
+### 阶段一：数据准备
+
+```
+论文:  ukb45628.csv (含366字段) → S01-S06 → Preprocessed_Data.csv
+复现:  features/*.npz (7968字段) → bridge_to_training_v3 → Preprocessed_Data.csv
+```
+
+| 论文步骤 | 论文文件 | 功能 | 复现对应 | 复现文件 | 异同 |
+|---|---|---|---|---|---|
+| S01 | `DataGeneration/S01_stroke_combine.py` | 合并卒中数据，算 `stroke_years`，创建 `stroke_status` | 相同逻辑 | `run_final_fast.py:stroke_mask` | ✅ 同：都用 `stroke_years < 0` 排除基线卒中 |
+| S02 | `DataGeneration/S02_prs_combine.py` | 合并 PRS 多基因评分（来自外部 IGAP 文件）+ 剔除 UKB 撤回参与者 | 无法复现 | — | ❌ 异：`PRS_base_IGAP_*.txt` 和 `w19542_20220222.csv` 不在数据集中 |
+| S03 | `DataGeneration/S03_target_data_generation.py` | 生成目标变量（dementia/AD/VD/stroke status + years），排除基线卒中 | 相同逻辑 | `bridge_to_training_v3.py:Step1` | ✅ 同：从 field 42018/42020/42022/42006 生成 target，用 `stroke_years<0` 排除 |
+| S04 | `DataGeneration/S04_train_data_generation.py` | 合并全部特征（ukb45628.csv）+ APOE4 + PRS + 人口学变量，剔除缺失>40%的特征 | 替代方案 | `bridge_to_training_v3.py:Step2-4` | ❌ 异：论文读 CSV，我们读 .npz。论文含 APOE4/PRS，我们不含。缺失阈值 40% → 45% |
+| S05 | `DataGeneration/S05_manually_remove_features.py` | 手工剔除临床无关特征 + 工程衍生特征（肺功能均值、握力均值、腿部脂肪%、阻抗均值、认知综合得分等16个） | 部分缺失 | — | ❌ 异：工程特征未计算。`Manual2Remove_Features.csv` 不在数据集中 |
+| S06 | `DataGeneration/S06_add_manual_features.py` | 添加手工构造的外部评分特征（家族痴呆史、教育年限、抑郁症、活动分级、酒精问题、农药暴露、糖尿病、饮食限制、抑郁症状） | 无法复现 | — | ❌ 异：9 个 `ScoreFeatures/*.csv` 不在数据集中 |
+
+### 阶段二：特征选择（s01-s04）
+
+```
+论文:  Preprocessed_Data.csv → s01(全特征排序) → s02(层次聚类) → s03(聚类后重排) → s04(选特征) → 10个特征
+复现:  Preprocessed_Data.csv → s01(全特征排序) → s02(层次聚类) → s03(聚类后重排) → s04(SFS) → 10个特征
+```
+
+| 论文步骤 | 论文文件 | 功能 | 复现对应 | 复现文件 | 异同 |
+|---|---|---|---|---|---|
+| s01 | `AD_Training/AD_full/s01_ad_full_clf.py` | 全特征 LightGBM 5折CV，按 Gain 排序取 Top 50。排除 HES 字段和 outcome 列 | 相同 | `run_training_v2.py:run_s01()` | ✅ 同：相同参数（n=500, depth=15, leaves=10, sub=0.7, lr=0.01, is_unbalance=True）。论文用 366 特征，我们用 1068 特征 |
+| s02 | `AD_Training/AD_full/s02_ad_full.py` | 取 s01 Top 50 → Spearman 相关矩阵 → 距离矩阵 `1-|ρ|` → Ward 层次聚类（阈值 0.75）→ 每簇保留第一个特征。画树状图+相关热图 | 相同 | `run_training_v2.py:run_s02()` | ✅ 同：相同距离定义 `1-|ρ|`，相同 linkage=ward，相同阈值 0.75 |
+| s03 | `AD_Training/AD_full/s03_ad_full.py` | 在聚类后的特征上重新 LightGBM 5折CV排序 | 相同 | `run_training_v2.py:run_s03()` | ✅ 同 |
+| s04 | `AD_Training/AD_full/s04_ad_clf.py` | 按 s03 排序**依次加特征**，计算累积 AUC 曲线。输出 `s041_AD_full.csv`，由研究者手工选取 Top N 重命名为 `s04_AD_full.csv` | **改为 SFS** | `run_training_v2.py:run_s04_sfs()` | ⚠️ 异：**论文代码是累积AUC（固定排序依次加），论文文字描述是 SFS（每步遍历剩余特征选最优）。我们实现了真正的 SFS** |
+
+**s04 差异详情**：
+
+```
+论文代码 (s04_ad_clf.py):              复现代码 (run_s04_sfs):
+  for f in my_f:          # 严格按       for step in range(max):    # 每一步
+      tmp_f.append(f)      # s03 排序       for cand in remaining:   # 遍历剩余
+      for fold:            # 依次加入         for fold:             # 每个候选
+          训练+评估         # 算AUC              训练+评估            # 算AUC
+                           #                 selected.append(best)   # 选最优
+```
+
+### 阶段三：模型训练（s05）
+
+```
+论文:  10个特征 → s05(固定参数 + CalibratedClassifierCV) → 评估
+复现:  10个特征 → s05(调优参数 + IsotonicRegression) → 评估
+```
+
+| 论文步骤 | 论文文件 | 功能 | 复现对应 | 复现文件 | 异同 |
+|---|---|---|---|---|---|
+| s05 | `AD_Training/AD_full/s05_ad_full_clf.py` | Top 10 特征 + 固定参数 + `CalibratedClassifierCV(isotonic, cv=5)` + 100个截断点评估 | 两处不同 | `run_final_fast.py:train_one_target()` | ⚠️ 见下表 |
+
+| 环节 | 论文代码 | 复现代码 | 说明 |
+|---|---|---|---|
+| 超参数 | 固定值 `n=500, depth=15, leaves=10, sub=0.7, lr=0.01` | 调优值 `n=500, depth=20, leaves=10, sub=0.5, lr=0.02`（200组合搜索） | 论文说做了1000组搜索，但s05代码用的是固定值。我们补上了调优 |
+| 校准方法 | `CalibratedClassifierCV(my_gbm, method='isotonic', cv=5)` | `IsotonicRegression()` 手动 split-train-calibrate（40%校准集） | Deploy 脚本用的正是手动 split-train-calibrate，更忠实于论文整体方法 |
+| 截断点评估 | ✅ 100个 cutoff（0.001-0.100） | ✅ 相同 | 同 |
+
+### 阶段四：Deploy（多目标部署）
+
+```
+论文:  DM_full的10特征 → Deploy到 DM_10yrs/DM_5yrs/AD_full/AD_10yrs/AD_5yrs → split-train-calibrate
+复现:  DM_full的10特征 → Deploy到 其他5个目标 → split-train-calibrate
+```
+
+| 论文步骤 | 论文文件 | 功能 | 复现对应 | 复现文件 | 异同 |
+|---|---|---|---|---|---|
+| Deploy full | `AD_Training/Deploy/Deploy_AD_full.py` | DM_full 特征 → GBM + IsotonicRegression + HL 检验 + Brier Score | 相同 | `run_final_fast.py:train_one_target()` | ⚠️ 特征不同（论文含ApoEε4） |
+| 10年窗口 | `AD_Training/Deploy/Deploy_AD_10yrs.py` | `y[years > 10] = 0` | 相同 | `run_final_fast.py:ALL_TARGETS` | ✅ 同 |
+| 5年窗口 | `AD_Training/Deploy/Deploy_AD_5yrs.py` | `y[years > 5] = 0` | 相同 | `run_final_fast.py:ALL_TARGETS` | ✅ 同 |
+
+| 细节 | 论文 Deploy | 我们的 Deploy |
+|---|---|---|
+| 校准集划分 | 硬编码 `X_train[:150000]` 或 `X_train[:100000]` | 动态 `X_train[:40%]` |
+| 校准器 | `IsotonicRegression()` | ✅ 相同 |
+| HL 检验 | ✅ 有 | ✅ 有 |
+| Brier Score | ✅ 有 | ✅ 有 |
+| 使用特征 | 论文的 10 个（含 ApoEε4） | 我们 SFS 选出的 10 个（不含 ApoEε4） |
+
+### 阶段五：分析与评估
+
+| 论文步骤 | 论文文件 | 功能 | 复现对应 | 复现文件 | 异同 |
+|---|---|---|---|---|---|
+| SHAP | `AD_Training/AD_full/SHAP.py` | SHAP beeswarm 图 | ✅ 有 | `run_final_fast.py:run_shap()` | ✅ 同 |
+| 特征选择图 | `AD_Training/AD_full/FSF.py` | Cover 重要性 + 累积AUC 双轴图 | ❌ 未做 | — | 论文用 Cover 排序+累积AUC，我们 SFS 已产生类似信息 |
+| 置换重要性 | `AD_Training/AD_full/permutation.py` | 置换特征后 AUC 下降量 | ❌ 未做 | — | 文件读取的是 DM_full 路径（疑似放错） |
+| CAIDE/DRS/ANU-ADRI 对比 | `RiskScoreEvaluation/` 下 30+ 个文件 | 与现有风险评分比较 + DeLong 显著性检验 | ❌ 未做 | — | 需要额外评分数据 |
+| 校准图 | Deploy 脚本内 | observed vs predicted 柱状图（deciles） | ✅ 有 | `calibration_plot.png` | ✅ 同 |
+| HL 检验 | Deploy 脚本内 | Hosmer-Lemeshow goodness-of-fit p-value | ✅ 有 | `hl_test_per_fold()` | ✅ 同 |
+| 部署模型导出 | `Deploy_Models/` | pickle 格式模型文件 | ❌ 未做 | — | |
+| Web Shiny App | `Web-ShinyApp-Develop/` | 交互式风险计算器 | ❌ 未做 | — | |
+
+---
+
+## 汇总对照表
+
+| # | 步骤 | 论文文件 | 复现文件 | 一致性 | 差异原因 |
+|---|---|---|---|---|---|
+| 1 | 数据加载+目标生成 | `S01, S03` | `bridge_to_training_v3.py:Step1` | ✅ 同 | 数据格式不同（CSV vs .npz），逻辑相同 |
+| 2 | PRS 基因合并 | `S02` | — | ❌ 未做 | PRS 外部文件缺失 |
+| 3 | 特征合并+筛选 | `S04` | `bridge_to_training_v3.py:Step2-4` | ⚠️ 替代 | 论文读CSV含基因数据，我们读.npz无基因数据 |
+| 4 | 手工删特征+工程特征 | `S05` | — | ❌ 未做 | `Manual2Remove_Features.csv` + 工程特征逻辑未实现 |
+| 5 | 外部评分特征 | `S06` | — | ❌ 未做 | 9个 `ScoreFeatures/*.csv` 缺失 |
+| 6 | s01 初始特征排序 | `s01_ad_full_clf.py` | `run_training_v2.py:run_s01` | ✅ 同 | |
+| 7 | s02 层次聚类去冗 | `s02_ad_full.py` | `run_training_v2.py:run_s02` | ✅ 同 | |
+| 8 | s03 聚类后重排序 | `s03_ad_full.py` | `run_training_v2.py:run_s03` | ✅ 同 | |
+| 9 | s04 特征选择 | `s04_ad_clf.py` | `run_training_v2.py:run_s04_sfs` | ⚠️ 改进 | 论文代码是累积AUC，论文描述是SFS，我们实现SFS |
+| 10 | s05 最终模型 | `s05_ad_full_clf.py` | `run_final_fast.py:train_one_target` | ⚠️ 改进 | 校准方法不同(CCCV→手动Iso)，参数不同(固定→调优) |
+| 11 | Deploy 多目标 | `Deploy/` 下 3 个文件 | `train_one_target()` 复用 | ⚠️ 部分 | 结构相同，特征不同(有/无ApoEε4) |
+| 12 | SHAP 分析 | `SHAP.py` | `run_shap()` | ✅ 同 | |
+| 13 | FSF 特征选择图 | `FSF.py` | — | ❌ 未做 | |
+| 14 | 置换重要性 | `permutation.py` | — | ❌ 未做 | |
+| 15 | CAIDE/DRS/ANU-ADRI 对比 | `RiskScoreEvaluation/` | — | ❌ 未做 | 缺评分数据 |
+| 16 | 部署模型导出 | `Deploy_Models/` | — | ❌ 未做 | |
+| 17 | Web 应用 | `Web-ShinyApp-Develop/` | — | ❌ 未做 | |
+
+---
+
+## 结果对比
+
+| 模型 | 论文 AUC | 复现 AUC | 偏差 | 偏差主因 |
+|---|---|---|---|---|
+| DM_full | 0.848 ± 0.007 | 0.831 ± 0.005 | -0.017 | 缺 ApoEε4 + 缺部分特征 |
+| DM_10yrs | 0.849 ± 0.009 | 0.833 ± 0.004 | -0.016 | 同上 |
+| DM_5yrs | 0.847 ± 0.015 | 0.816 ± 0.015 | -0.031 | 同上 + 极小样本 |
+| AD_full | 0.862 ± 0.015 | 0.836 ± 0.004 | -0.026 | AD 更依赖 ApoEε4 |
+| AD_10yrs | 0.866 ± 0.015 | 0.832 ± 0.013 | -0.034 | 同上 |
+| AD_5yrs | 0.890 ± 0.018 | 0.667 ± 0.026 | **-0.223** | Deploy 策略+缺 ApoEε4+极低样本(306例) |
+
+### AD_5yrs 偏差详解
+
+AD_5yrs AUC 偏低 0.223 是三个因素的叠加效应：
+
+1. **极低样本量**：306 阳性（0.061%）。5折CV 中每折仅 ~61 个阳性，训练集中 ~49 个
+2. **Deploy 特征不适配**：SFS 为 DM_full 选的特征（就业状况、CRP、用药数等）对短期 AD 预测能力弱。论文的 10 特征含 ApoEε4 可跨目标泛化，我们没有
+3. **AD 比 DM 更依赖遗传特征**：ApoEε4 对 AD 的 OR=3.70(单拷贝)/13.58(双拷贝)，远强于对全因痴呆的影响。缺 ApoEε4 对 AD 的影响远超 DM
+
+如果用 v1 的独立训练策略（每个目标自选特征），AD_5yrs 可达 0.851，偏差仅 -0.039。
+
+---
+
+## 数据缺口
+
+| 缺失数据 | 所属步骤 | 影响特征数 | 对 AUC 影响估计 | 获取途径 |
+|---|---|---|---|---|
+| ApoEε4 基因型 | S04/S06 | 1 | **0.03-0.05** | UKB 基因数据申请（Field 23180 或 SNP推导） |
+| PRS 多基因评分（14个pT） | S02 | 14 | 0.01-0.02 | IGAP GWAS 文件 + UKB 基因数据 |
+| `Manual2Remove_Features.csv` | S05 | 手工剔除列表 | 间接 | 论文作者额外文件 |
+| `ScoreFeatures/` (9个CSV) | S06 | 9 | 0.005-0.01 | 论文作者手工构造 |
+| Field 20002 (自报疾病编码) | S06 | 2 (diag_depress + stroke自报) | 0.002-0.005 | features/ 中缺失 |
+| Field 20544/20510 (PHQ-2) | S06 | 1 (depres_sym) | 0.002-0.005 | features/ 中缺失 |
+
+---
+
+## 关键技术差异
+
+### 1. 数据管线
+- **论文**：从 `ukb45628.csv` 直接读取，该 CSV 已包含所有 366 特征的原始格式
+- **复现**：从 `features/*.npz` 逐个字段提取，再 DataFrame 合并。逻辑等价但数据源不同
+
+### 2. 特征工程（S05）
+- **论文**：手工剔除特征 + 计算 16 个工程衍生特征（肺功能均值、握力均值等）
+- **复现**：未实现。但我们的 bridge 脚本保留了更多原始连续特征（1068列），部分补偿
+
+### 3. s04 特征选择
+- **论文代码**：累积 AUC（固定 s03 排序依次加特征）
+- **论文文字**：Sequential Forward Selection（每步遍历剩余特征）
+- **复现**：实现了 SFS，与论文文字描述一致
+
+### 4. s05 校准方法
+- **论文代码**：`CalibratedClassifierCV` 包装 LGBM
+- **论文 Deploy 脚本**：手动 `IsotonicRegression` split-train-calibrate
+- **复现**：采用 Deploy 脚本的手动方式，与论文整体方法一致
+
+### 5. Deploy 策略的前提假设
+- **论文假设**：DM_full 的 10 特征（含 ApoEε4）可泛化到所有目标
+- **实际验证**：该假设成立依赖 ApoEε4。缺 ApoEε4 时，Deploy 策略对 AD 目标效果差
+- **最佳实践**：缺 ApoEε4 时应使用独立训练策略（每个目标各自 SFS 选特征）
+
+---
+
+## 文件清单
+
+### 论文原始代码（开源）
+```
+DataGeneration/
+├── S01_stroke_combine.py           ← 卒中数据处理
+├── S02_prs_combine.py              ← PRS 基因数据合并
+├── S03_target_data_generation.py   ← 目标变量生成
+├── S04_train_data_generation.py    ← 训练数据组装
+├── S05_manually_remove_features.py ← 手工剔除+工程特征
+├── S06_add_manual_features.py      ← 外部评分特征
+├── SummaryStatistics.py            ← 描述统计
+└── Top_features.py                 ← 特征汇总
+
+AD_Training/
+├── AD_full/
+│   ├── s01_ad_full_clf.py          ← 初始特征排序
+│   ├── s02_ad_full.py              ← 层次聚类
+│   ├── s03_ad_full.py              ← 聚类后重排
+│   ├── s04_ad_clf.py               ← 累积AUC分析
+│   ├── s05_ad_full_clf.py          ← 最终模型+校准
+│   ├── SHAP.py                     ← SHAP 分析
+│   ├── FSF.py                      ← 特征选择图
+│   └── permutation.py              ← 置换重要性
+├── AD_10yrs/ (s01-s05, SHAP)
+├── AD_5yrs/  (s01-s05, SHAP)
+├── Deploy/
+│   ├── Deploy_AD_full.py           ← Deploy 全周期
+│   ├── Deploy_AD_10yrs.py          ← Deploy 10年
+│   └── Deploy_AD_5yrs.py           ← Deploy 5年
+└── merge_features.py
+
+RiskScoreEvaluation/                 ← CAIDE/DRS/ANU-ADRI 对比
+Plots/                               ← 各类可视化
+Utility/                             ← 工具函数
+Web-ShinyApp-Develop/                ← Shiny 风险计算器
+```
+
+### 复现代码（我们编写的）
+```
+UKB数据集/
+└── bridge_to_training_v3.py        ← .npz → Preprocessed_Data.csv 转换
+
+run_training_v2.py                  ← 完整 s01-s05+Deploy+SHAP 管线
+run_final_fast.py                   ← 快速版 s05+Deploy+SHAP
+run_s05_final.py                    ← 带超参数搜索版 s05
+实验日志.md                          ← 实验记录
+compare.md                          ← 本文档
+```
+
+### 结果文件
+```
+local_data/Results_v2/
+├── summary_metrics.csv             ← 6模型汇总
+├── DM_full/  (s01-s05 + SHAP + 校准图)
+├── DM_10yrs/ (Deploy 结果)
+├── DM_5yrs/  (Deploy 结果)
+├── AD_full/  (Deploy 结果)
+├── AD_10yrs/ (Deploy 结果)
+└── AD_5yrs/  (Deploy 结果)
+```

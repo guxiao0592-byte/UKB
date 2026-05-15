@@ -1,0 +1,98 @@
+============================================================
+UKB-DRP Final Training (Fast)
+============================================================
+Loaded: 494,658 participants (after stroke exclusion)
+Features: ['34-0.0', '400-0.0', '137-0.0', '2188-0.0_c1', '30710-0.0', '20110-0.4_pos', '1090-0.0', '6142-0.3_pos', '20023-0.0', '3526-0.0']
+
+============================================================
+[DM_full] n_pos=9545, rate=1.93%
+============================================================
+  Fold 1/5: AUC=0.8350, HL-p=nan, time=3s
+  Fold 2/5: AUC=0.8307, HL-p=nan, time=3s
+  Fold 3/5: AUC=0.8355, HL-p=nan, time=3s
+  Fold 4/5: AUC=0.8219, HL-p=nan, time=3s
+  Fold 5/5: AUC=0.8325, HL-p=nan, time=4s
+  AUC=0.8310±0.0050, Brier=0.0182, HL-p=nan, Sens=0.8180, Spec=0.7020
+
+[SHAP] DM_full...
+  SHAP saved.
+
+============================================================
+[DM_10yrs] n_pos=4164, rate=0.84%
+============================================================
+  Fold 1/5: AUC=0.8401, HL-p=nan, time=3s
+  Fold 2/5: AUC=0.8338, HL-p=nan, time=3s
+  Fold 3/5: AUC=0.8306, HL-p=nan, time=3s
+  Fold 4/5: AUC=0.8271, HL-p=nan, time=3s
+  Fold 5/5: AUC=0.8351, HL-p=nan, time=3s
+  AUC=0.8330±0.0040, Brier=0.0082, HL-p=nan, Sens=0.7990, Spec=0.7190
+
+[SHAP] DM_10yrs...
+  SHAP saved.
+
+============================================================
+[DM_5yrs] n_pos=906, rate=0.18%
+============================================================
+  Fold 1/5: AUC=0.7895, HL-p=nan, time=3s
+  Fold 2/5: AUC=0.8133, HL-p=nan, time=3s
+  Fold 3/5: AUC=0.8292, HL-p=nan, time=3s
+  Fold 4/5: AUC=0.8203, HL-p=nan, time=3s
+  Fold 5/5: AUC=0.8286, HL-p=nan, time=3s
+  AUC=0.8160±0.0150, Brier=0.0018, HL-p=nan, Sens=0.7780, Spec=0.7190
+
+[SHAP] DM_5yrs...
+  SHAP saved.
+
+============================================================
+[AD_full] n_pos=4315, rate=0.87%
+============================================================
+  Fold 1/5: AUC=0.8338, HL-p=nan, time=4s
+  Fold 2/5: AUC=0.8343, HL-p=nan, time=3s
+  Fold 3/5: AUC=0.8367, HL-p=nan, time=4s
+  Fold 4/5: AUC=0.8323, HL-p=nan, time=4s
+  Fold 5/5: AUC=0.8445, HL-p=nan, time=4s
+  AUC=0.8360±0.0040, Brier=0.0085, HL-p=nan, Sens=0.8620, Spec=0.6630
+
+[SHAP] AD_full...
+  SHAP saved.
+
+============================================================
+[AD_10yrs] n_pos=1681, rate=0.34%
+============================================================
+  Fold 1/5: AUC=0.8529, HL-p=nan, time=3s
+  Fold 2/5: AUC=0.8286, HL-p=nan, time=4s
+  Fold 3/5: AUC=0.8131, HL-p=nan, time=4s
+  Fold 4/5: AUC=0.8276, HL-p=nan, time=3s
+  Fold 5/5: AUC=0.8357, HL-p=nan, time=3s
+  AUC=0.8320±0.0130, Brier=0.0034, HL-p=nan, Sens=0.8020, Spec=0.7240
+
+[SHAP] AD_10yrs...
+  SHAP saved.
+
+============================================================
+[AD_5yrs] n_pos=294, rate=0.06%
+============================================================
+  Fold 1/5: AUC=0.6407, HL-p=nan, time=3s
+  Fold 2/5: AUC=0.6551, HL-p=nan, time=3s
+  Fold 3/5: AUC=0.6725, HL-p=nan, time=3s
+  Fold 4/5: AUC=0.7142, HL-p=nan, time=3s
+  Fold 5/5: AUC=0.6507, HL-p=nan, time=4s
+  AUC=0.6670±0.0260, Brier=0.0006, HL-p=nan, Sens=0.4900, Spec=0.8430
+
+[SHAP] AD_5yrs...
+  SHAP saved.
+
+============================================================
+FINAL SUMMARY
+============================================================
+Model           AUC           HL-p       Sens       Spec       Cutoff    
+--------------------------------------------------------------------
+DM_full         0.8310±0.0050  nan     0.8180   0.7020   0.021
+DM_10yrs        0.8330±0.0040  nan     0.7990   0.7190   0.009
+DM_5yrs         0.8160±0.0150  nan     0.7780   0.7190   0.002
+AD_full         0.8360±0.0040  nan     0.8620   0.6630   0.008
+AD_10yrs        0.8320±0.0130  nan     0.8020   0.7240   0.004
+AD_5yrs         0.6670±0.0260  nan     0.4900   0.8430   0.001
+
+Total time: 3.4 min
+Results: /Users/guxiao/Downloads/项目文档/Coding/MCI风险预测/UKB_DRP-main/local_data/Results_v2

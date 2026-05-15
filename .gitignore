@@ -1,0 +1,43 @@
+# Data directories (too large for GitHub)
+UKB数据集/
+local_data/Data/
+local_data/Preprocessed_Data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secrets / config with paths
+*.ini
+!example*.ini
+
+# Claude AI config
+.claude/
+
+# Paper PDFs / large binaries
+*.pdf
+*.docx
+*.pptx
+
+# R data files (exported models, large)
+Deploy_Models/

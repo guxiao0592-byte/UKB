@@ -1,0 +1,1 @@
+local_data/adni/Tables_20May2026.zip filter=lfs diff=lfs merge=lfs -text

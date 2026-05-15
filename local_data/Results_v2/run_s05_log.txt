@@ -1,0 +1,33 @@
+======================================================================
+UKB-DRP s05 Final Model Training (Paper Reproduction)
+======================================================================
+  Excluded 7583 baseline stroke, remaining: 494,658
+
+Primary features (from SFS): ['34-0.0', '400-0.0', '137-0.0', '2188-0.0_c1', '30710-0.0', '20110-0.4_pos', '1090-0.0', '6142-0.3_pos', '20023-0.0', '3526-0.0']
+Features available in X_all: 10/10
+
+======================================================================
+[s05] DM_full — 200 hyperparameter combos + Isotonic calibration
+======================================================================
+  Sampling 200 combos from 3072 total
+
+  --- Fold 1/5 ---
+    Combo 50/200, best AUC so far: 0.8303
+    Combo 100/200, best AUC so far: 0.8308
+    Combo 150/200, best AUC so far: 0.8308
+    Combo 200/200, best AUC so far: 0.8308
+  Best params (AUC=0.8308): {'n_estimators': 500, 'max_depth': 20, 'num_leaves': 10, 'subsample': 0.5, 'learning_rate': 0.02, 'colsample_bytree': 0.5}
+  Fold AUC=0.8350, HL-p=nan, time=1146s
+
+  --- Fold 2/5 ---
+    Combo 50/200, best AUC so far: 0.8317
+    Combo 100/200, best AUC so far: 0.8317
+    Combo 150/200, best AUC so far: 0.8317
+    Combo 200/200, best AUC so far: 0.8317
+  Best params (AUC=0.8317): {'n_estimators': 300, 'max_depth': 10, 'num_leaves': 10, 'subsample': 0.5, 'learning_rate': 0.02, 'colsample_bytree': 0.7}
+  Fold AUC=0.8311, HL-p=nan, time=1099s
+
+  --- Fold 3/5 ---
+    Combo 50/200, best AUC so far: 0.8297
+    Combo 100/200, best AUC so far: 0.8302
+    Combo 150/200, best AUC so far: 0.8302
