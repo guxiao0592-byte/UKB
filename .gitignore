@@ -1,5 +1,7 @@
 # Data directories (too large for GitHub)
-UKB数据集/
+UKB数据集/*.npz
+UKB数据集/features/
+UKB数据集/numpy_data/
 local_data/Data/
 local_data/Preprocessed_Data/
 

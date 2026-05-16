@@ -1,0 +1,162 @@
+# 三方对比：论文文字描述 vs 论文开源代码 vs 复现实现
+
+## 一、APOE4 追踪：它到底有没有参与最终训练？
+
+### 答案：论文公开代码中，APOE4 没有进入最终模型
+
+追踪链路：
+
+```
+Preprocessed_Data.csv（包含 APOE4 + PRS + 106 UKB字段）
+    │
+    ▼ s01: LightGBM 5折CV 训练
+    │     X = mydf.drop(rm_f)    ← APOE4 在 X 中，被训练，有 Gain 分数
+    │     my_imp_df               ← 全部特征按 Gain 排名（含 APOE4）
+    │     │
+    │     │  ⚠️ 代码第66-67行：
+    │     │  dict_f = FieldID_selected.csv    ← UKB 字段描述文件（不含 APOE4）
+    │     │  my_lst = merge(my_imp_df, dict_f, how='inner', on='Features')
+    │     │          ↑ INNER JOIN → APOE4 不在 dict_f 中 → 被丢弃！
+    │     │
+    │     ▼ my_lst.to_csv('s01_AD_full.csv')  ← 输出中已无 APOE4
+    │
+    ▼ s02: my_f = s01_AD_full.csv['Features'][:50]  ← 从过滤后的列表读 Top50
+    │                                                    APOE4 不在其中
+    ▼ s03: my_f = s02_AD_full.csv['Features']         ← 同样没有 APOE4
+    │
+    ▼ s04: my_f = s03_AD_full.csv['Features']         ← 同样没有 APOE4
+    │     按固定顺序依次加特征，算累积 AUC
+    │
+    ▼ s05: my_f = s04_AD_full.csv['Features'][:10]    ← Top 10 没有 APOE4
+    │     X = mydf[my_f]                               ← 只用这 10 个特征训练
+    │     CalibratedClassifierCV(...).fit(X_train, y_train)
+    │
+    ▼ Deploy: 同样读取 s04 的 10 个特征，split-train-calibrate
+```
+
+**结论：APOE4 在 s01 参与了 LightGBM 训练并获得了 Gain 重要性分数，但因为 s01 输出时用 `FieldID_selected.csv` 做了 inner join，APOE4 被过滤掉了。s02-s05 以及 Deploy 全部读取的是过滤后的列表，APOE4 从未进入特征选择流程，也未进入最终 10 特征模型。**
+
+---
+
+## 二、三方完整对照
+
+### 阶段 A：数据准备
+
+| 环节 | 论文文字 | 论文代码 | 复现实现 |
+|------|---------|---------|---------|
+| 数据源 | UKB 原始数据 | `ukb45628.csv` (366列) + target_full.csv (APOE4/PRS等) | `features/*.npz` (7968字段) |
+| 字段筛选 | — | 从 CSV 读 raw_features.csv 指定字段，合并 demographics + APOE4 + 14个PRS | 从 .npz 按字段类型筛选，排除环境/HES |
+| 卒中排除 | 排除基线卒中 | `stroke_years < 0` | ✅ 相同逻辑 |
+| 缺失过滤 | >40% | `isnull().sum()/len(mydf) >= 0.4` | >45%（.npz 缺失率偏高） |
+| 手工剔除(S05) | 剔除16个无关/工程特征 | 读 Manual2Remove_Features.csv + 算工程衍生特征 | ❌ 未实现（缺源文件） |
+| 外部评分(S06) | 添加9个评分特征 | 读 9 个 ScoreFeatures/*.csv | ❌ 未实现（缺源文件） |
+| **最终特征数** | **"366个特征"** | **~106个 (+ APOE4 + PRS)** | **1076个 (v1) → 138个 (v2对齐版)** |
+
+注：论文说"366个特征"是指 ukb45628.csv 的列数，但经过 S04 的缺失过滤和 S05 的手工剔除后，实际进入 Preprocessed_Data.csv 的特征约 106 个。
+
+### 阶段 B：特征选择 (s01-s04)
+
+| 环节 | 论文文字 | 论文代码 | 复现实现 |
+|------|---------|---------|---------|
+| s01 方法 | 全特征 LightGBM 5折CV 排序 | ✅ 一致 | ✅ 一致 |
+| s01 参数 | n=500, depth=15, leaves=10, sub=0.7, lr=0.01 | ✅ 一致 | ✅ 一致 |
+| **s01 输出** | — | ⚠️ inner join FieldID_selected.csv **丢弃 APOE4/PRS** | 直接输出全部特征排名 |
+| s02 方法 | Spearman → 1-\|ρ\| → Ward 聚类 (0.75) | ✅ 一致 | ✅ 一致 |
+| s02 输入 | — | 读 s01 输出 Top50（**不含 APOE4**） | 读 s01 输出 Top50 |
+| s03 方法 | 聚类后 LightGBM 重排 | ✅ 一致 | ✅ 一致 |
+| **s04 方法** | **Sequential Forward Selection** | **累积AUC（严格按 s03 排序依次加）** | **真正的 SFS** |
+| s04 逻辑 | 每步遍历剩余特征选最优 | `for f in my_f: tmp_f.append(f); train+eval` | `for step: for cand in remaining: train+eval; select(best)` |
+| s04 选特征数 | 研究者手工从曲线选 Top N | 手工将 s041 重命名为 s04 | 自动选 Top 10 |
+
+**s04 方法差异详解：**
+
+```
+论文代码 (累积AUC):                    复现 (真正的 SFS):
+  for f in my_f:        # 严格按       for step in range(10):
+      tmp_f.append(f)     # s03 排序       best_f = None
+      5折CV 训练+评估                    for cand in remaining:
+  → 输出累积AUC曲线                        5折CV 训练+评估
+  → 研究者手工选Top N                    selected.append(best_f)
+                                       → 每步选最优，与论文文字描述一致
+```
+
+### 阶段 C：最终训练 (s05)
+
+| 环节 | 论文文字 | 论文代码 | 复现实现 |
+|------|---------|---------|---------|
+| **超参数** | **"1000组 exhaustive search"** | **固定值：n=500, depth=15, leaves=10, sub=0.7, lr=0.01** | **200组随机搜索 → 调优值：n=500, depth=20, leaves=10, sub=0.5, lr=0.02** |
+| **校准方法** | — | **CalibratedClassifierCV (isotonic, cv=5)** | **手动 IsotonicRegression split-train-calibrate (40%校准集)** |
+| 截断点评估 | 100个 cutoff | ✅ 一致 | ✅ 一致 |
+| HL 检验 | 有 | ✅ 有 | ✅ 有 |
+| Brier Score | 有 | ✅ 有 | ✅ 有 |
+| 使用特征数 | — | 10个 | 10个 |
+
+注：论文说做了1000组超参搜索，但 s05 代码使用的是固定参数（与 s01-s04 完全相同的参数）。我们的超参搜索补上了这个环节。
+
+注2：论文 s05 用 CalibratedClassifierCV，但 Deploy 脚本用手动 IsotonicRegression split-train-calibrate。同一论文不同阶段用不同校准方法，且未解释。我们统一用了 Deploy 脚本的手动方式。
+
+### 阶段 D：部署 (Deploy)
+
+| 环节 | 论文文字 | 论文代码 | 复现实现 |
+|------|---------|---------|---------|
+| 策略 | DM_full特征 → 所有目标 | DM_full/AD_full 特征 → 对应目标 | DM_full特征 → 所有目标 |
+| 校准集划分 | — | 硬编码 `X_train[:150000]` 或 `X_train[:100000]` | 动态 `X_train[:40%]` |
+| 校准器 | — | IsotonicRegression() | ✅ 相同 |
+| 使用特征 | 论文的10个（应含APOE4） | 论文s04选出的10个（**不含APOE4**） | SFS选出的10个（不含APOE4） |
+
+---
+
+## 三、关键差异总结
+
+### 1. 方法论层面
+
+| # | 问题 | 严重性 |
+|---|------|:---:|
+| 1 | **s04 代码与文字矛盾**：代码是累积AUC，论文文字描述是 SFS | ⭐⭐⭐ |
+| 2 | **s05 超参数声明不实**：论文说1000组搜索，代码用固定参数 | ⭐⭐⭐ |
+| 3 | **s05 vs Deploy 校准方法不一致**：一个用CCCV，一个用手动Iso | ⭐⭐ |
+| 4 | **APOE4 意外排除**：s01 inner join 过滤掉基因特征，论文未察觉 | ⭐⭐⭐⭐ |
+
+### 2. 特征层面
+
+| 论文最终10特征 | 来源 | 复现 SFS 10特征 (v2对齐版) | 来源 |
+|---|---|---|---|
+| 34-0.0 (认知测试) | UKB字段 | 34-0.0 | UKB字段 |
+| 400-0.0 (反应速度) | UKB字段 | 137-0.0 (用药数) | UKB字段 |
+| 137-0.0 (用药数) | UKB字段 | 400-0.0 (反应速度) | UKB字段 |
+| 131287-0.0_c8 (高血压源) | UKB字段 | 30710-0.0 (CRP) | UKB字段 |
+| 20023-0.0 (反应速度) | UKB字段 | 20110-0.8 (母亲病史) | UKB字段 |
+| 131351-0.0_c8 (房颤源) | UKB字段 | 20023-0.0 (反应速度) | UKB字段 |
+| 131287-0.0_c6 (高血压源) | UKB字段 | 23115-0.0 (腿部阻抗) | UKB字段 |
+| 20110-1.1_pos (母亲病史) | UKB字段 | 131287-0.0_c6 (高血压源) | UKB字段 |
+| 20008-0.2 (首次诊断年份) | UKB字段 | 131287-0.0_c4 (高血压源) | UKB字段 |
+| 3526-0.0 (母亲寿命) | UKB字段 | 3526-0.0 (母亲寿命) | UKB字段 |
+| **APOE4** ← 论文声称包含 | **但代码排除了** | **无** (缺数据) | — |
+
+**共有6/10特征一致**。论文更偏临床诊断记录（高血压、房颤、首次诊断），复现更偏功能性+血液指标（CRP、腿部阻抗）。
+
+### 3. 结果对比
+
+| 目标 | 论文报告AUC | 论文代码(应含APOE4) | 复现(无APOE4) | 差距 vs 论文报告 |
+|------|:---:|:---:|:---:|:---:|
+| DM_full | 0.848 | 未知* | 0.830 | -0.018 |
+| DM_10yrs | 0.849 | 未知* | 0.828 | -0.021 |
+| DM_5yrs | 0.847 | 未知* | 0.802 | -0.045 |
+| AD_full | 0.862 | 未知* | 0.833 | -0.029 |
+| AD_10yrs | 0.866 | 未知* | 0.826 | -0.040 |
+| AD_5yrs | 0.890 | 未知* | 0.648 | -0.242 |
+
+*注：论文公开展示的 s01-s04 结果是基于过滤后的特征集（不含APOE4），但论文报告的最终 AUC 数值来源不明——公开代码中的 s04 累积 AUC 仅到 ~0.835（DM_full），与报告的 0.848 存在差距。
+
+---
+
+## 四、关于 APOE4 的最终判断
+
+APOE4 **在论文公开代码中没有参与最终模型训练**，原因：
+
+1. APOE4 在 s01 被训练并排名，但 **s01 输出时被 inner join 过滤**
+2. s02-s05 全部读取过滤后的特征列表
+3. 公开代码仓库中的 s04 输出和结果文件都不含 APOE4
+4. 论文报告的 AUC（0.848-0.890）高于公开代码中的累积AUC上限（~0.835），暗示论文作者使用的代码版本可能与开源版本不同
+
+**APOE4 没有参与最终训练不是因为不重要——恰恰相反，它被意外排除了。**
