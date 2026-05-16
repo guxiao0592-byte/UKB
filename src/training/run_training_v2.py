@@ -18,7 +18,7 @@ Reference: Yu et al., eClinicalMedicine 2022;53:101665
 import os, sys, warnings, time, gc, json
 warnings.filterwarnings('ignore')
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_ROOT)
 
 import numpy as np
