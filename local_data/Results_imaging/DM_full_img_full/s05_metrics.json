@@ -1,0 +1,85 @@
+{
+  "target": "DM_full",
+  "auc_mean": 0.837,
+  "auc_std": 0.004,
+  "brier_score": 0.018133958046379434,
+  "hl_pvalue": 0.1004,
+  "best_cutoff": 0.019,
+  "sensitivity": 0.839,
+  "specificity": 0.691,
+  "youden": 0.53,
+  "features": [
+    "34-0.0",
+    "400-0.0",
+    "137-0.0",
+    "12651-0.0",
+    "2188-0.0_c1",
+    "30710-0.0",
+    "20110-0.4_pos",
+    "6142-0.3_pos",
+    "26643-0.0",
+    "1200-0.0_c0"
+  ],
+  "fold_results": [
+    {
+      "fold": 0,
+      "auc": 0.8395098159154553,
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 20,
+        "num_leaves": 8,
+        "subsample": 0.7,
+        "learning_rate": 0.02,
+        "colsample_bytree": 0.5
+      }
+    },
+    {
+      "fold": 1,
+      "auc": 0.837044878953734,
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 20,
+        "num_leaves": 8,
+        "subsample": 0.7,
+        "learning_rate": 0.02,
+        "colsample_bytree": 0.5
+      }
+    },
+    {
+      "fold": 2,
+      "auc": 0.8392654834690658,
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 20,
+        "num_leaves": 8,
+        "subsample": 0.7,
+        "learning_rate": 0.02,
+        "colsample_bytree": 0.5
+      }
+    },
+    {
+      "fold": 3,
+      "auc": 0.8287991261917137,
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 20,
+        "num_leaves": 8,
+        "subsample": 0.7,
+        "learning_rate": 0.02,
+        "colsample_bytree": 0.5
+      }
+    },
+    {
+      "fold": 4,
+      "auc": 0.8394838656640538,
+      "params": {
+        "n_estimators": 500,
+        "max_depth": 20,
+        "num_leaves": 8,
+        "subsample": 0.7,
+        "learning_rate": 0.02,
+        "colsample_bytree": 0.5
+      }
+    }
+  ]
+}
