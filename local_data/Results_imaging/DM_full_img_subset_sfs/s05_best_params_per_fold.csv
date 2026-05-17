@@ -1,0 +1,6 @@
+n_estimators,max_depth,num_leaves,subsample,learning_rate,colsample_bytree
+500,15,8,0.6,0.005,0.8
+500,20,8,0.5,0.005,0.7
+500,20,8,0.5,0.005,0.7
+500,20,8,0.5,0.005,0.7
+300,10,8,0.5,0.01,0.5
