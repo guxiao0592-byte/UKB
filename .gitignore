@@ -17,6 +17,8 @@ build/
 venv/
 .venv/
 env/
+enve/
+temp_env/
 packages/
 
 # IDE

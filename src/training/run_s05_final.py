@@ -135,7 +135,6 @@ def hl_test_per_fold(y_true, y_pred, n_bins=10):
 def load_and_prepare():
     mydf = pd.read_csv(PREPROCESSED_CSV)
     mydf['AD_years'] = mydf['AD_years'].fillna(mydf['dementia_years'])
-    mydf['AD_years'] = mydf['AD_years'].clip(lower=-1)
 
     # Exclude baseline stroke
     stroke_mask = (mydf['stroke_years'] < 0) & (mydf['stroke_years'].notna())
@@ -151,11 +150,30 @@ def load_and_prepare():
     return mydf, rm_f
 
 def apply_time_window(mydf, target_col, years_col, max_years=None):
+    """Apply time window and proper censoring.
+
+    Returns (y, include_mask).
+    UKB data encoding: years_col < 0 means no event,
+    abs(years_col) = follow-up duration in years.
+    """
     y = mydf[target_col].copy()
+    include = pd.Series(True, index=mydf.index)
+
     if max_years is not None:
         y_years = mydf[years_col]
+
+        # Converters whose event occurred AFTER the window → label as 0
         y.loc[(y == 1) & (y_years > max_years)] = 0
-    return y
+
+        # Non-converters with insufficient follow-up → CENSOR
+        insufficient_fu = (
+            (y == 0) &
+            (y_years < 0) &
+            (y_years.abs() < max_years)
+        )
+        include = ~insufficient_fu
+
+    return y, include
 
 # ===== S05: FINAL MODEL =====
 def run_s05(mydf, X_all, y, features, results_dir, target_name, n_combos=N_PARAM_COMBOS):
@@ -340,8 +358,17 @@ def run_deploy(mydf, X_all, target_name, features, results_dir, n_combos=100):
     t0 = time.time()
 
     target_col, years_col, max_years = ALL_TARGETS[target_name]
-    y = apply_time_window(mydf, target_col, years_col, max_years)
+    y_full, include = apply_time_window(mydf, target_col, years_col, max_years)
     X = X_all[[f for f in features[:TOP_N] if f in X_all.columns]]
+
+    # Filter censored subjects
+    n_censored = (~include).sum()
+    if n_censored > 0:
+        print(f"  [CENSOR] excluding {n_censored} subjects with insufficient follow-up")
+        y = y_full[include].copy()
+        X = X[include].copy()
+    else:
+        y = y_full
 
     print(f"  n_pos={y.sum()}, rate={y.sum()/len(y)*100:.2f}%")
 
@@ -449,7 +476,8 @@ if __name__ == '__main__':
 
     # ===== DM_full (primary model) =====
     target_col, years_col, max_years = ALL_TARGETS['DM_full']
-    y_dm_full = apply_time_window(mydf, target_col, years_col, max_years)
+    y_dm_full, include_dm = apply_time_window(mydf, target_col, years_col, max_years)
+    # DM_full has max_years=None → no censoring, include_dm is all True
     os.makedirs(s04_dir, exist_ok=True)
 
     metrics = run_s05(mydf, X_all, y_dm_full, primary_features, s04_dir, 'DM_full', n_combos=N_PARAM_COMBOS)
@@ -467,8 +495,13 @@ if __name__ == '__main__':
         all_metrics[dt] = m
 
         target_col_d, years_col_d, max_years_d = ALL_TARGETS[dt]
-        y_d = apply_time_window(mydf, target_col_d, years_col_d, max_years_d)
-        run_shap(mydf, X_all, y_d, primary_features, deploy_dir, dt)
+        y_d, include_d = apply_time_window(mydf, target_col_d, years_col_d, max_years_d)
+        if (~include_d).sum() > 0:
+            y_d = y_d[include_d]
+            X_d = X_all[include_d]
+        else:
+            X_d = X_all
+        run_shap(mydf, X_d, y_d, primary_features, deploy_dir, dt)
         gc.collect()
 
     # ===== Summary =====

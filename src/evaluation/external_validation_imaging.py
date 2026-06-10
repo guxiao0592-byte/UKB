@@ -70,9 +70,9 @@ print(f"  Non-imaging shape: {X_noimg.shape}")
 img_list = pd.read_csv(os.path.join(DPATH, 'Preprocessed_Data', 'imaging_feature_list.csv'))
 imaging_cols = set(img_list['feature'].tolist())
 
-# Fix AD_years
+# Fix AD_years: preserve negative values for follow-up duration (censoring)
 for df in [X_img, X_noimg]:
-    df['AD_years'] = df['AD_years'].fillna(df['dementia_years']).clip(lower=-1)
+    df['AD_years'] = df['AD_years'].fillna(df['dementia_years'])
 
 # Exclude baseline stroke
 for df in [X_img, X_noimg]:
@@ -273,14 +273,31 @@ def evaluate_model(X_train_all, X_test_all, selected_features, model_name):
     results = []
     for tname, (tcol, ycol, my) in TARGETS.items():
         y_tr = X_train_all[tcol].copy()
+        include_tr = pd.Series(True, index=X_train_all.index)
         if my is not None:
             y_tr.loc[(y_tr == 1) & (X_train_all[ycol] > my)] = 0
+            # Censoring: exclude non-converters with insufficient follow-up
+            insufficient_tr = (
+                (y_tr == 0) & (X_train_all[ycol] < 0) &
+                (X_train_all[ycol].abs() < my)
+            )
+            include_tr = ~insufficient_tr
+
         y_te = X_test_all[tcol].copy()
+        include_te = pd.Series(True, index=X_test_all.index)
         if my is not None:
             y_te.loc[(y_te == 1) & (X_test_all[ycol] > my)] = 0
+            insufficient_te = (
+                (y_te == 0) & (X_test_all[ycol] < 0) &
+                (X_test_all[ycol].abs() < my)
+            )
+            include_te = ~insufficient_te
 
         test_f = [f for f in selected_features if f in X_test_all.columns]
-        X_tr = X_train_all[test_f]; X_te = X_test_all[test_f]
+        X_tr = X_train_all[test_f][include_tr]
+        X_te = X_test_all[test_f][include_te]
+        y_tr = y_tr[include_tr]
+        y_te = y_te[include_te]
 
         n_calib = int(len(X_tr) * 0.4)
         gbm = LGBMClassifier(objective='binary', is_unbalance=True, metric='auc', verbosity=-1, seed=2022)

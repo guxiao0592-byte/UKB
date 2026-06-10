@@ -255,19 +255,33 @@ results = []
 for target_name, (target_col, years_col, max_years) in TARGETS.items():
     print(f"\n── {TARGET_LABELS[target_name]} ──")
 
-    # Build target
+    # Build target with proper censoring
     y_train = X_train_all[target_col].copy()
+    include_tr = pd.Series(True, index=X_train_all.index)
     if max_years is not None:
         y_train.loc[(y_train == 1) & (X_train_all[years_col] > max_years)] = 0
+        insufficient_tr = (
+            (y_train == 0) & (X_train_all[years_col] < 0) &
+            (X_train_all[years_col].abs() < max_years)
+        )
+        include_tr = ~insufficient_tr
 
     y_test = X_test_all[target_col].copy()
+    include_te = pd.Series(True, index=X_test_all.index)
     if max_years is not None:
         y_test.loc[(y_test == 1) & (X_test_all[years_col] > max_years)] = 0
+        insufficient_te = (
+            (y_test == 0) & (X_test_all[years_col] < 0) &
+            (X_test_all[years_col].abs() < max_years)
+        )
+        include_te = ~insufficient_te
 
     # Features available in test set
     test_features = [f for f in selected if f in X_test_all.columns]
-    X_tr = X_train_all[test_features]
-    X_te = X_test_all[test_features]
+    X_tr = X_train_all[test_features][include_tr]
+    X_te = X_test_all[test_features][include_te]
+    y_train = y_train[include_tr]
+    y_test = y_test[include_te]
 
     print(f"  Train: n={len(y_train):,}, events={y_train.sum():,}")
     print(f"  Test:  n={len(y_test):,}, events={y_test.sum():,}")

@@ -199,9 +199,9 @@ def load_and_prepare_data():
     """Load preprocessed data and prepare target variables."""
     mydf = pd.read_csv(PREPROCESSED_CSV)
 
-    # Fix AD_years: use dementia_years for negative AD_years
+    # Fix AD_years: use dementia_years for missing AD_years
+    # Negative AD_years = non-converter, abs(value) = follow-up years
     mydf['AD_years'] = mydf['AD_years'].fillna(mydf['dementia_years'])
-    mydf['AD_years'] = mydf['AD_years'].clip(lower=-1)
 
     # Columns to remove as outcomes/IDs
     rm_f1 = ['Unnamed: 0', 'eid', 'dementia_status', 'dementia_years',
@@ -213,13 +213,37 @@ def load_and_prepare_data():
 
 
 def apply_time_window(mydf, target_col, years_col, max_years=None):
-    """Apply time window clipping: y[years > max_years] = 0."""
+    """Apply time window and proper censoring.
+
+    Returns (y, include_mask):
+      - y: binary target (1 = event within window, 0 = no event within window)
+      - include_mask: boolean Series, False = exclude from analysis
+        (non-converters with insufficient follow-up to confirm negativity)
+
+    UKB data encoding: years_col < 0 means no event,
+    abs(years_col) = follow-up duration in years.
+    """
     y = mydf[target_col].copy()
+    include = pd.Series(True, index=mydf.index)
+
     if max_years is not None:
         y_years = mydf[years_col]
-        mask = (y == 1) & (y_years > max_years)
-        y.loc[mask] = 0
-    return y
+
+        # Converters whose event occurred AFTER the window → label as 0
+        # (they are true negatives WITHIN the window)
+        late_event = (y == 1) & (y_years > max_years)
+        y.loc[late_event] = 0
+
+        # Non-converters with insufficient follow-up → CENSOR (exclude)
+        # y_years < 0 means no event; abs(y_years) = follow-up years
+        insufficient_fu = (
+            (y == 0) &
+            (y_years < 0) &
+            (y_years.abs() < max_years)
+        )
+        include = ~insufficient_fu
+
+    return y, include
 
 
 def exclude_baseline_stroke(mydf):
@@ -775,8 +799,15 @@ def run_deploy(mydf, X_all, deploy_target_name, primary_features, results_dir):
     t0 = time.time()
 
     target_col, years_col, max_years = ALL_TARGETS[deploy_target_name]
-    y_deploy = apply_time_window(mydf, target_col, years_col, max_years)
+    y_deploy, include = apply_time_window(mydf, target_col, years_col, max_years)
     X = X_all[primary_features[:TOP_N_S04]]
+
+    # Filter censored subjects
+    n_censored = (~include).sum()
+    if n_censored > 0:
+        print(f"  [CENSOR] excluding {n_censored} subjects with insufficient follow-up")
+        y_deploy = y_deploy[include]
+        X = X[include]
 
     n_pos = y_deploy.sum()
     print(f"  Target: {deploy_target_name}, n_pos={n_pos}, "
@@ -1011,34 +1042,47 @@ def run_pipeline(use_deploy_strategy=True, exclude_stroke=True):
 
     for target_name in primary_targets:
         target_col, years_col, max_years = ALL_TARGETS[target_name]
-        y = apply_time_window(mydf, target_col, years_col, max_years)
+        y_full, include = apply_time_window(mydf, target_col, years_col, max_years)
+
+        # Proper censoring: exclude non-converters with insufficient follow-up
+        n_censored = (~include).sum()
+        if n_censored > 0:
+            print(f"\n  [CENSOR] {target_name}: excluding {n_censored} subjects "
+                  f"with insufficient follow-up")
+            mydf_t = mydf[include].copy()
+            X_t = X_all[include].copy()
+            y = y_full[include].copy()
+        else:
+            mydf_t = mydf
+            X_t = X_all
+            y = y_full
 
         results_dir = os.path.join(RESULTS_BASE, target_name)
         os.makedirs(results_dir, exist_ok=True)
 
         print(f"\n{'#'*70}")
-        print(f"# PRIMARY MODEL: {target_name} (n_pos={y.sum()})")
+        print(f"# PRIMARY MODEL: {target_name} (n_pos={y.sum()}, n_total={len(y)})")
         print(f"{'#'*70}")
 
         # s01: Initial feature importance
-        s01_df = run_s01(mydf, X_all, y, results_dir)
+        s01_df = run_s01(mydf_t, X_t, y, results_dir)
 
         # s02: Hierarchical clustering
-        s02_df = run_s02(mydf, X_all, y, s01_df, results_dir)
+        s02_df = run_s02(mydf_t, X_t, y, s01_df, results_dir)
 
         # s03: Final feature importance
-        s03_df = run_s03(mydf, X_all, y, s02_df, results_dir)
+        s03_df = run_s03(mydf_t, X_t, y, s02_df, results_dir)
 
         # s04: Sequential Forward Selection
-        s04_df = run_s04_sfs(mydf, X_all, y, s03_df, results_dir)
+        s04_df = run_s04_sfs(mydf_t, X_t, y, s03_df, results_dir)
 
         # s05: Final model with tuning + Isotonic calibration
-        metrics = run_s05(mydf, X_all, y, s04_df, results_dir, target_name)
+        metrics = run_s05(mydf_t, X_t, y, s04_df, results_dir, target_name)
         all_metrics[target_name] = metrics
 
         # SHAP analysis
         primary_features = s04_df['Features'][:TOP_N_S04].tolist()
-        run_shap(mydf, X_all, y, primary_features, results_dir, target_name)
+        run_shap(mydf_t, X_t, y, primary_features, results_dir, target_name)
 
         # Calibration plot
         plot_calibration(results_dir, target_name)
@@ -1056,8 +1100,14 @@ def run_pipeline(use_deploy_strategy=True, exclude_stroke=True):
 
             # SHAP for deployed model
             target_col, years_col, max_years = ALL_TARGETS[deploy_name]
-            y_deploy = apply_time_window(mydf, target_col, years_col, max_years)
-            run_shap(mydf, X_all, y_deploy, primary_features, deploy_dir, deploy_name)
+            y_deploy, include_deploy = apply_time_window(mydf, target_col, years_col, max_years)
+            if (~include_deploy).sum() > 0:
+                y_shap = y_deploy[include_deploy]
+                X_shap = X_all[include_deploy]
+            else:
+                y_shap = y_deploy
+                X_shap = X_all
+            run_shap(mydf, X_shap, y_shap, primary_features, deploy_dir, deploy_name)
             gc.collect()
 
     # --- Summary ---
@@ -1120,23 +1170,35 @@ if __name__ == '__main__':
         X_all = mydf.drop(columns=rm_f)
 
         target_col, years_col, max_years = ALL_TARGETS[args.target]
-        y = apply_time_window(mydf, target_col, years_col, max_years)
+        y_full, include = apply_time_window(mydf, target_col, years_col, max_years)
+
+        # Filter censored subjects
+        n_censored = (~include).sum()
+        if n_censored > 0:
+            print(f"  [CENSOR] excluding {n_censored} subjects with insufficient follow-up")
+            mydf_t = mydf[include].copy()
+            X_t = X_all[include].copy()
+            y = y_full[include].copy()
+        else:
+            mydf_t = mydf
+            X_t = X_all
+            y = y_full
 
         results_dir = os.path.join(RESULTS_BASE, args.target)
         os.makedirs(results_dir, exist_ok=True)
 
         print(f"\n{'#'*70}")
-        print(f"# SINGLE TARGET: {args.target} (n_pos={y.sum()})")
+        print(f"# SINGLE TARGET: {args.target} (n_pos={y.sum()}, n_total={len(y)})")
         print(f"{'#'*70}")
 
-        s01_df = run_s01(mydf, X_all, y, results_dir)
-        s02_df = run_s02(mydf, X_all, y, s01_df, results_dir)
-        s03_df = run_s03(mydf, X_all, y, s02_df, results_dir)
-        s04_df = run_s04_sfs(mydf, X_all, y, s03_df, results_dir)
-        metrics = run_s05(mydf, X_all, y, s04_df, results_dir, args.target)
+        s01_df = run_s01(mydf_t, X_t, y, results_dir)
+        s02_df = run_s02(mydf_t, X_t, y, s01_df, results_dir)
+        s03_df = run_s03(mydf_t, X_t, y, s02_df, results_dir)
+        s04_df = run_s04_sfs(mydf_t, X_t, y, s03_df, results_dir)
+        metrics = run_s05(mydf_t, X_t, y, s04_df, results_dir, args.target)
 
         features = s04_df['Features'][:TOP_N_S04].tolist()
-        run_shap(mydf, X_all, y, features, results_dir, args.target)
+        run_shap(mydf_t, X_t, y, features, results_dir, args.target)
         plot_calibration(results_dir, args.target)
 
     else:

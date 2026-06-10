@@ -65,14 +65,16 @@
 
 论文不是只预测一种病，而是预测六种不同的"目标"：
 
-| 目标 | 含义 |
-|------|------|
-| DM_full | 全因痴呆，不限时间窗口 |
-| DM_10yrs | 10 年内发生的全因痴呆 |
-| DM_5yrs | 5 年内发生的全因痴呆 |
-| AD_full | 阿尔茨海默病，不限时间 |
-| AD_10yrs | 10 年内发生的 AD |
-| AD_5yrs | 5 年内发生的 AD |
+┌──────────┬────────────────────────┐
+│ 目标     │ 含义                   │
+├──────────┼────────────────────────┤
+│ DM_full  │ 全因痴呆，不限时间窗口 │
+│ DM_10yrs │ 10 年内发生的全因痴呆  │
+│ DM_5yrs  │ 5 年内发生的全因痴呆   │
+│ AD_full  │ 阿尔茨海默病，不限时间 │
+│ AD_10yrs │ 10 年内发生的 AD       │
+│ AD_5yrs  │ 5 年内发生的 AD        │
+└──────────┴────────────────────────┘
 
 DM = Dementia（全因痴呆），AD = Alzheimer's Disease（阿尔茨海默病）。AD 是 DM 的一个子类，约占 60-70%。
 
@@ -535,24 +537,27 @@ DM_5yrs 追回了 84% 的差距，说明短期预测中影像几乎可以等价�
 
 ## 附录：关键术语速查表
 
-| 术语 | 全称 | 含义 |
-|------|------|------|
-| UKB | UK Biobank | 英国生物样本库，50 万人的大型队列研究 |
-| DRP | Dementia Risk Prediction | 痴呆风险预测 |
-| AUC | Area Under the ROC Curve | 模型区分病例和对照的能力，0.5=随机，1=完美 |
-| SFS | Sequential Forward Selection | 前向序列选择，每一步遍历剩余特征选增益最大的 |
-| CV | Cross-Validation | 交叉验证，将数据分成 K 份轮流训练/测试 |
-| DeLong | DeLong Test | 比较两个相关 ROC 曲线 AUC 差异的统计检验 |
-| HL | Hosmer-Lemeshow Test | 检验模型校准的统计方法 |
-| ECE | Expected Calibration Error | 期望校准误差，预测概率和实际概率的偏差 |
-| DCA | Decision Curve Analysis | 决策曲线分析，评估不同阈值下的净收益 |
-| Brier | Brier Score | 预测概率的均方误差，衡量校准 |
-| PPV/NPV | Positive/Negative Predictive Value | 阳性/阴性预测值 |
-| ISO | Isotonic Regression | 保序回归，非参数校准方法 |
-| IDP | Imaging-Derived Phenotype | 从 MRI 图像自动提取的定量指标 |
-| FA/MD | Fractional Anisotropy / Mean Diffusivity | 各向异性分数/平均弥散率，衡量白质完整性 |
-| dMRI | Diffusion MRI | 弥散磁共振，测量水分子在组织中的扩散 |
-| ApoE | Apolipoprotein E | 载脂蛋白 E，ε4 等位基因是 AD 最大遗传风险因子 |
-| PRS | Polygenic Risk Score | 多基因风险评分，综合全基因组 SNP 的效应 |
-| SNP | Single Nucleotide Polymorphism | 单核苷酸多态性，基因上的单个碱基变异 |
-| OR | Odds Ratio | 比值比，衡量风险因子和疾病的关联强度 |
+┌─────────┬──────────────────────────────────────────┬───────────────────────────────────────────────┐
+│ 术语    │ 全称                                     │ 含义                                          │
+├─────────┼──────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ UKB     │ UK Biobank                               │ 英国生物样本库，50 万人的大型队列研究         │
+│ DRP     │ Dementia Risk Prediction                 │ 痴呆风险预测                                  │
+│ AUC     │ Area Under the ROC Curve                 │ 模型区分病例和对照的能力，0.5=随机，1=完美    │
+│ SFS     │ Sequential Forward Selection             │ 前向序列选择，每一步遍历剩余特征选增益最大的  │
+│ CV      │ Cross-Validation                         │ 交叉验证，将数据分成 K 份轮流训练/测试        │
+│ DeLong  │ DeLong Test                              │ 比较两个相关 ROC 曲线 AUC 差异的统计检验      │
+│ HL      │ Hosmer-Lemeshow Test                     │ 检验模型校准的统计方法                        │
+│ ECE     │ Expected Calibration Error               │ 期望校准误差，预测概率和实际概率的偏差        │
+│ DCA     │ Decision Curve Analysis                  │ 决策曲线分析，评估不同阈值下的净收益          │
+│ Brier   │ Brier Score                              │ 预测概率的均方误差，衡量校准                  │
+│ PPV/NPV │ Positive/Negative Predictive Value       │ 阳性/阴性预测值                               │
+│ ISO     │ Isotonic Regression                      │ 保序回归，非参数校准方法                      │
+│ IDP     │ Imaging-Derived Phenotype                │ 从 MRI 图像自动提取的定量指标                 │
+│ FA/MD   │ Fractional Anisotropy / Mean Diffusivity │ 各向异性分数/平均弥散率，衡量白质完整性       │
+│ dMRI    │ Diffusion MRI                            │ 弥散磁共振，测量水分子在组织中的扩散          │
+│ ApoE    │ Apolipoprotein E                         │ 载脂蛋白 E，ε4 等位基因是 AD 最大遗传风险因子 │
+│ PRS     │ Polygenic Risk Score                     │ 多基因风险评分，综合全基因组 SNP 的效应       │
+│ SNP     │ Single Nucleotide Polymorphism           │ 单核苷酸多态性，基因上的单个碱基变异          │
+│ OR      │ Odds Ratio                               │ 比值比，衡量风险因子和疾病的关联强度          │
+└─────────┴──────────────────────────────────────────┴───────────────────────────────────────────────┘
+
