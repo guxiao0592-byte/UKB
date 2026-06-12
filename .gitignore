@@ -5,6 +5,15 @@ UKB数据集/numpy_data/
 local_data/Data/
 local_data/Preprocessed_Data/
 
+# ADNI raw data (235MB zip) — too large
+思路一/ADNI数据集/extracted/
+思路一/ADNI数据集/*.zip
+思路一/ADNI数据集/processed/
+
+# Large result images (keep CSVs for traceability)
+local_data/Results_adni/**/*.png
+local_data/Results_adni/**/*.png
+
 # Python
 __pycache__/
 *.pyc
