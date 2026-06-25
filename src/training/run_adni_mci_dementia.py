@@ -39,9 +39,13 @@ warnings.filterwarnings('ignore')
 # ══════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════
+_PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_DEFAULT_ADNI_DIR = os.path.join(_PROJECT_ROOT, 'local_data', 'adni')
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--data-dir', type=str,
-                    default='/Users/guxiao/Downloads/MCI-AD/思路一/ADNI数据集',
+                    default=os.environ.get('ADNI_DATA_DIR', _DEFAULT_ADNI_DIR),
                     help='ADNI dataset root directory')
 parser.add_argument('--window', type=str, default='3,5,10',
                     help='Time windows to run (comma-separated: 3,5,10)')
@@ -51,8 +55,7 @@ parser.add_argument('--model', type=str, default='all',
 args = parser.parse_args()
 
 DATA_DIR = os.path.join(args.data_dir, 'processed')
-RESULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))), 'local_data', 'Results_adni', 'mci_to_dementia')
+RESULTS_DIR = os.path.join(_PROJECT_ROOT, 'local_data', 'Results_adni', 'mci_to_dementia')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 WINDOWS = [int(w.strip()) for w in args.window.split(',')]

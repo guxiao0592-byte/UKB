@@ -21,9 +21,11 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
-DPATH = 'local_data/Preprocessed_Data'
+PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+DPATH = os.path.join(PROJECT_ROOT, 'local_data', 'Preprocessed_Data')
 PREPROCESSED_CSV = os.path.join(DPATH, 'Preprocessed_Data_full.csv')
-RESULTS_DIR = 'local_data/Results_v2/_aligned_features_v2'
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'local_data', 'Results_v2', '_aligned_features_v2')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 RANDOM_STATE = 2022; N_SPLITS = 5; TOP_N = 10

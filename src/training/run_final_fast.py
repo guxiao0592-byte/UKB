@@ -6,7 +6,8 @@ Completes all 6 models in ~30 min.
 """
 import os, sys, warnings, time, json
 warnings.filterwarnings('ignore')
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_ROOT)
 
 import numpy as np

@@ -4,9 +4,16 @@ External validation: hold-out 80/20 split.
 Train full pipeline (s01-s05) on training set, evaluate on held-out test set.
 Compare with CAIDE & ANU-ADRI risk scores on the SAME test set.
 """
-import os, json, time, warnings
+import os, json, time, warnings, sys
 import numpy as np
 import pandas as pd
+
+# Support both direct invocation and import
+PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+DPATH = os.path.join(PROJECT_ROOT, 'local_data', 'Preprocessed_Data')
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'local_data', 'Results_v2', '_external_validation')
+os.makedirs(RESULTS_DIR, exist_ok=True)
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.metrics import (
     roc_auc_score, accuracy_score, recall_score, precision_score,
@@ -22,10 +29,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
-
-DPATH = 'local_data/Preprocessed_Data'
-RESULTS_DIR = 'local_data/Results_v2/_external_validation'
-os.makedirs(RESULTS_DIR, exist_ok=True)
 
 N_SPLITS = 5
 RANDOM_STATE = 2022

@@ -1,0 +1,3 @@
+cohort,n_total,n_events_survival,n_events_sustained,n_events_CDRSB,n_events_composite,median_event_time,valid_3yr,events_3yr,valid_5yr,events_5yr,valid_10yr,events_10yr
+CN,633,208,86,146,208,4.168377823408624,546,67,439,120,281,189
+MCI,962,373,223,620,502,2.0506502395619437,704,235,576,308,444,361

@@ -1,20 +1,39 @@
-# Data directories (too large for GitHub)
-UKB数据集/*.npz
-UKB数据集/features/
-UKB数据集/numpy_data/
-local_data/Data/
+# ═══════════════════════════════════════════════════════════
+# UKB source data (large .npz files)
+# ═══════════════════════════════════════════════════════════
+local_data/ukb/numpy_data/
+local_data/ukb/features/
+local_data/ukb/__pycache__/
+
+# ═══════════════════════════════════════════════════════════
+# ADNI source data (66 CSVs, ~224MB)
+# ═══════════════════════════════════════════════════════════
+local_data/adni/extracted/
+local_data/adni/processed/
+local_data/adni/__pycache__/
+
+# ═══════════════════════════════════════════════════════════
+# Preprocessed data (large CSVs, generated)
+# ═══════════════════════════════════════════════════════════
 local_data/Preprocessed_Data/
+local_data/Data/
 
-# ADNI raw data (235MB zip) — too large
-思路一/ADNI数据集/extracted/
-思路一/ADNI数据集/*.zip
-思路一/ADNI数据集/processed/
+# ═══════════════════════════════════════════════════════════
+# Legacy external data paths (compat)
+# ═══════════════════════════════════════════════════════════
+UKB数据集/
+思路一/
 
+# ═══════════════════════════════════════════════════════════
 # Large result images (keep CSVs for traceability)
+# ═══════════════════════════════════════════════════════════
 local_data/Results_adni/**/*.png
-local_data/Results_adni/**/*.png
+local_data/Results_v2/**/*.png
+local_data/Results_imaging/**/*.png
 
+# ═══════════════════════════════════════════════════════════
 # Python
+# ═══════════════════════════════════════════════════════════
 __pycache__/
 *.pyc
 *.pyo
@@ -22,7 +41,9 @@ __pycache__/
 dist/
 build/
 
+# ═══════════════════════════════════════════════════════════
 # Virtual environments
+# ═══════════════════════════════════════════════════════════
 venv/
 .venv/
 env/
@@ -30,28 +51,31 @@ enve/
 temp_env/
 packages/
 
+# ═══════════════════════════════════════════════════════════
 # IDE
+# ═══════════════════════════════════════════════════════════
 .vscode/
 .idea/
 
+# ═══════════════════════════════════════════════════════════
 # OS
+# ═══════════════════════════════════════════════════════════
 .DS_Store
 Thumbs.db
 
-# Jupyter
-.ipynb_checkpoints/
+# ═══════════════════════════════════════════════════════════
+# Logs
+# ═══════════════════════════════════════════════════════════
+logs/
 
-# Secrets / config with paths
-*.ini
-!example*.ini
-
-# Claude AI config
-.claude/
-
-# Paper PDFs / large binaries
+# ═══════════════════════════════════════════════════════════
+# Misc
+# ═══════════════════════════════════════════════════════════
 *.pdf
 *.docx
 *.pptx
-
-# R data files (exported models, large)
+*.ini
+!example*.ini
+.claude/
+.ipynb_checkpoints/
 Deploy_Models/

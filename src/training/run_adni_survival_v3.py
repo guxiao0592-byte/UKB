@@ -26,8 +26,11 @@ warnings.filterwarnings('ignore')
 t0 = time.time()
 
 # ═══════════════════════════════ CONFIG ═══════════════════════════════
-DATA_PATH = '/Users/guxiao/Downloads/MCI-AD/思路一/ADNI数据集/processed/ADNI_baseline_with_time_targets_v2.csv'
-BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ADNI_DATA_DIR = os.environ.get('ADNI_DATA_DIR',
+    os.path.join(BASE, 'local_data', 'adni'))
+DATA_PATH = os.path.join(ADNI_DATA_DIR, 'processed', 'ADNI_baseline_with_time_targets_v2.csv')
 RESULTS_DIR = os.path.join(BASE, 'local_data', 'Results_adni', 'survival')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 

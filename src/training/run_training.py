@@ -7,7 +7,8 @@ Chains together s01 → s02 → s03 → s04 → s05 for AD_full model.
 import os, sys, warnings, gc
 warnings.filterwarnings('ignore')
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_ROOT)  # So Utility/ modules can be found
 
 # ===== CONFIGURATION =====

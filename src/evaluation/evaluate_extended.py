@@ -11,6 +11,10 @@ Extended evaluation: clinical interpretability metrics beyond AUC.
 import os, json, warnings
 import numpy as np
 import pandas as pd
+
+PROJECT_ROOT = os.environ.get('PROJECT_ROOT',
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+RESULTS_ROOT = os.path.join(PROJECT_ROOT, 'local_data', 'Results_v2')
 from scipy import stats
 from sklearn.metrics import (
     roc_auc_score, roc_curve, precision_recall_curve, average_precision_score,
@@ -23,7 +27,6 @@ import matplotlib.ticker as ticker
 
 warnings.filterwarnings('ignore')
 
-RESULTS_ROOT = 'local_data/Results_v2'
 TARGETS = ['DM_full', 'DM_10yrs', 'DM_5yrs', 'AD_full', 'AD_10yrs', 'AD_5yrs']
 TARGET_LABELS = {
     'DM_full': 'All-cause Dementia (full)', 'DM_10yrs': 'All-cause Dementia (10yr)',
