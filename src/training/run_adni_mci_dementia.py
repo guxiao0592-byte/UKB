@@ -90,7 +90,11 @@ CDR_COLS = ['CDMEMORY', 'CDORIENT', 'CDJUDGE', 'CDCOMMUN',
             'CDHOME', 'CDCARE', 'CDGLOBAL', 'CDRSB']
 # ID/元数据列
 ID_COLS = ['PTID', 'RID', 'PHASE', 'VISCODE', 'VISCODE2',
-           'APOE_genotype', 'subject_id', 'entry_research_group', 'PTDOBYY']
+           'APOE_genotype', 'subject_id', 'entry_research_group', 'PTDOBYY',
+           # CDR builder 内部列 (object 类型, 需排除)
+           '_feat_baseline_date', '_birth_year',
+           'cdr_cohort', 'index_date', 'index_viscode',
+           'index_CDGLOBAL']
 # 目标标签列
 TARGET_COLS = [
     'AD_status', 'MCI_status', 'dementia_status', 'DIAGNOSIS',
@@ -303,6 +307,9 @@ def main():
     all_feat = [c for c in mci_df.columns if c not in all_exclude]
     clean_feat = [c for c in all_feat
                   if not any(c.startswith(p) for p in COGNITIVE_PREFIXES)]
+    # Drop non-numeric columns (auto-filters leftover object/string meta columns)
+    num_cols = set(mci_df.select_dtypes(include=[np.number]).columns)
+    clean_feat = [c for c in clean_feat if c in num_cols]
     clean_clinical = [c for c in clean_feat if not c.startswith(IMAGING_PFX)]
     clean_imaging = [c for c in clean_feat if c.startswith(IMAGING_PFX)]
 
